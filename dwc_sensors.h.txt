@@ -1,0 +1,41 @@
+// ====================================================
+// SENSOR INTERFACE LIBRARY
+// ====================================================
+
+#ifndef DWC_SENSORS_H
+#define DWC_SENSORS_H
+
+#include <Arduino.h>
+
+// Sensor Pins Configuration
+#define VOLTAGE_SENSOR_PIN     A0
+#define CURRENT_SENSOR_PIN     A1
+#define TEMPERATURE_SENSOR_PIN A2
+#define ALIGNMENT_SENSOR_PIN   A3
+
+// Calibration Constants
+#define VOLTAGE_CALIBRATION    0.004887  // 5V / 1023
+#define CURRENT_CALIBRATION    0.0244    // 25mA per unit
+#define TEMP_CALIBRATION       0.1       // Degrees per unit
+
+// Sensor Data Structure
+struct SensorData {
+  float inputVoltage;     // Volts
+  float inputCurrent;     // Amps
+  float outputVoltage;    // Volts  
+  float outputCurrent;    // Amps
+  float temperature;      // Celsius
+  float misalignment;     // Centimeters
+  unsigned long timestamp;
+};
+
+// Function Prototypes
+void initializeSensors();
+SensorData readAllSensors();
+float readVoltage(int pin);
+float readCurrent(int pin);
+float readTemperature(int pin);
+float readAlignment(int pin);
+bool performSafetyCheck();
+
+#endif

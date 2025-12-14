@@ -1,0 +1,6 @@
+# Python Dependencies for DWC Monitoring System
+pyserial==3.5
+matplotlib==3.5.1
+pandas==1.4.2
+numpy==1.22.3
+tkinter  # Built-in Python

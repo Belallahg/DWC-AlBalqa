@@ -1,0 +1,101 @@
+%% ====================================================
+% SMART DWC - EFFICIENCY SIMULATION
+% Al-Balqa Applied University
+% Graduation Project 2024/2025
+% ====================================================
+
+clear all; close all; clc;
+
+%% Simulation Parameters
+fprintf('========================================\n');
+fprintf('SMART DWC SYSTEM SIMULATION\n');
+fprintf('Al-Balqa Applied University\n');
+fprintf('========================================\n\n');
+
+% System Parameters
+f_operating = 85000;          % Operating frequency (85 kHz)
+P_rated = 100;                % Rated power (W)
+V_in = 48;                    % Input voltage (V)
+coupling_range = 0.05:0.05:0.3; % Coupling coefficient range
+misalignment_range = 0:5:20;   % Misalignment (cm)
+
+%% Efficiency Calculation Function
+calculate_efficiency = @(k, offset) ...
+    90 * exp(-0.5 * offset) * (1 - exp(-10 * k)); % Empirical model
+
+%% Simulation 1: Efficiency vs Coupling Coefficient
+figure('Position', [100, 100, 800, 600]);
+subplot(2,2,1);
+
+k = 0.05:0.01:0.3;
+eff_k = calculate_efficiency(k, 0);
+plot(k*100, eff_k, 'b-', 'LineWidth', 2);
+grid on;
+xlabel('Coupling Coefficient k (%)');
+ylabel('Efficiency (%)');
+title('Efficiency vs Coupling Coefficient');
+xlim([5 30]);
+ylim([50 95]);
+
+% Add optimal point
+[eff_max, idx] = max(eff_k);
+hold on;
+plot(k(idx)*100, eff_max, 'ro', 'MarkerSize', 10, 'LineWidth', 2);
+text(k(idx)*100, eff_max+2, sprintf('Max: %.1f%%', eff_max), ...
+    'HorizontalAlignment', 'center');
+
+%% Simulation 2: Efficiency vs Misalignment
+subplot(2,2,2);
+
+offset = 0:0.5:20;
+eff_offset = calculate_efficiency(0.25, offset);
+plot(offset, eff_offset, 'r-', 'LineWidth', 2);
+grid on;
+xlabel('Lateral Misalignment (cm)');
+ylabel('Efficiency (%)');
+title('Efficiency vs Misalignment');
+xlim([0 20]);
+ylim([50 95]);
+
+% Mark thresholds
+hold on;
+plot([10 10], [50 95], 'g--', 'LineWidth', 1);
+plot([15 15], [50 95], 'y--', 'LineWidth', 1);
+plot([20 20], [50 95], 'r--', 'LineWidth', 1);
+legend('Efficiency', '10cm', '15cm', '20cm', 'Location', 'best');
+
+%% Simulation 3: 3D Surface Plot
+subplot(2,2,[3 4]);
+
+[K, OFFSET] = meshgrid(k, offset);
+EFF = calculate_efficiency(K, OFFSET);
+
+surf(K*100, OFFSET, EFF, 'EdgeColor', 'none');
+xlabel('Coupling Coefficient k (%)');
+ylabel('Misalignment (cm)');
+zlabel('Efficiency (%)');
+title('3D Efficiency Analysis');
+colorbar;
+colormap jet;
+view(45, 30);
+grid on;
+
+%% Results Summary
+fprintf('SIMULATION RESULTS:\n');
+fprintf('-------------------\n');
+fprintf('Optimal Coupling (k): %.2f%%\n', k(idx)*100);
+fprintf('Maximum Efficiency: %.1f%%\n', eff_max);
+fprintf('Efficiency at 10cm offset: %.1f%%\n', calculate_efficiency(0.25, 10));
+fprintf('Efficiency at 15cm offset: %.1f%%\n', calculate_efficiency(0.25, 15));
+fprintf('Efficiency at 20cm offset: %.1f%%\n', calculate_efficiency(0.25, 20));
+fprintf('\n');
+
+%% Save Results
+results = struct();
+results.coupling_coefficient = k;
+results.misalignment = offset;
+results.efficiency_matrix = EFF;
+results.optimal_point = [k(idx), eff_max];
+
+save('simulation_results.mat', 'results');
+fprintf('Results saved to simulation_results.mat\n');

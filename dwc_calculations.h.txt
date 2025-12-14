@@ -1,0 +1,52 @@
+// ====================================================
+// CALCULATION ALGORITHMS LIBRARY
+// ====================================================
+
+#ifndef DWC_CALCULATIONS_H
+#define DWC_CALCULATIONS_H
+
+// Efficiency Calculation
+float calculateEfficiency(float Vin, float Iin, float Vout, float Iout);
+
+// Power Calculations
+float calculateInputPower(float voltage, float current);
+float calculateOutputPower(float voltage, float current);
+float calculatePowerLoss(float Pin, float Pout);
+
+// Temperature Compensation
+float applyTemperatureCompensation(float value, float temperature);
+
+// Misalignment Detection
+float detectCoilMisalignment(float sensorValue);
+float calculateOptimalFrequency(float misalignment);
+
+// Adaptive Control Algorithms
+class AdaptivePID {
+private:
+  float Kp, Ki, Kd;
+  float integral, previousError;
+  float sampleTime = 0.1; // 100ms
+  
+public:
+  AdaptivePID(float p, float i, float d) : Kp(p), Ki(i), Kd(d) {}
+  
+  void setGains(float couplingFactor) {
+    if (couplingFactor > 0.2) {
+      Kp = 1.2; Ki = 0.05; Kd = 0.01;
+    } else if (couplingFactor > 0.1) {
+      Kp = 0.8; Ki = 0.03; Kd = 0.02;
+    } else {
+      Kp = 0.5; Ki = 0.02; Kd = 0.03;
+    }
+  }
+  
+  float compute(float error) {
+    integral += error * sampleTime;
+    float derivative = (error - previousError) / sampleTime;
+    previousError = error;
+    
+    return (Kp * error) + (Ki * integral) + (Kd * derivative);
+  }
+};
+
+#endif

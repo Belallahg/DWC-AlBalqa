@@ -1,0 +1,40 @@
+%% ====================================================
+% COIL DESIGN AND OPTIMIZATION
+% Magnetic Resonant Coupling Coil
+% ====================================================
+
+% Coil Parameters
+coil_diameter = 0.30;       % 30cm diameter
+num_turns = 20;
+wire_diameter = 0.001;      % 1mm wire
+operating_freq = 85000;     % 85 kHz
+
+% Material Properties
+mu0 = 4*pi*1e-7;            % Permeability of free space
+sigma_copper = 5.96e7;      % Conductivity of copper
+
+% Calculate Inductance (Wheeler's approximation)
+coil_radius = coil_diameter / 2;
+L = (num_turns^2 * coil_radius^2) / (9*coil_radius + 10*num_turns*wire_diameter);
+L = L * 1e-6;  % Convert to microHenries
+
+% Calculate Required Capacitance for Resonance
+C = 1 / ((2*pi*operating_freq)^2 * L);
+
+% Calculate AC Resistance (Skin Effect)
+skin_depth = 1 / sqrt(pi * operating_freq * mu0 * sigma_copper);
+R_ac = num_turns * (2*pi*coil_radius) / (sigma_copper * wire_diameter * skin_depth);
+
+% Calculate Quality Factor
+Q_factor = (2*pi*operating_freq * L) / R_ac;
+
+% Display Results
+fprintf('\nCOIL DESIGN RESULTS:\n');
+fprintf('=====================\n');
+fprintf('Coil Diameter: %.2f m\n', coil_diameter);
+fprintf('Number of Turns: %d\n', num_turns);
+fprintf('Inductance (L): %.2f μH\n', L*1e6);
+fprintf('Capacitance (C): %.2f nF\n', C*1e9);
+fprintf('Resonant Frequency: %.0f kHz\n', operating_freq/1000);
+fprintf('Quality Factor (Q): %.1f\n', Q_factor);
+fprintf('Skin Depth: %.3f mm\n', skin_depth*1000);

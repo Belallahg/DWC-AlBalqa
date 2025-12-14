@@ -1,0 +1,42 @@
+// ====================================================
+// COMMUNICATION PROTOCOL LIBRARY
+// ====================================================
+
+#ifndef DWC_COMMUNICATION_H
+#define DWC_COMMUNICATION_H
+
+#include <Arduino.h>
+
+// Communication Protocol Constants
+#define START_BYTE     0xAA
+#define END_BYTE       0x55
+#define PACKET_SIZE    16
+
+// Command Definitions
+enum SystemCommand {
+  CMD_START_CHARGING   = 0x01,
+  CMD_STOP_CHARGING    = 0x02,
+  CMD_GET_STATUS       = 0x03,
+  CMD_SET_POWER        = 0x04,
+  CMD_EMERGENCY_STOP   = 0xFF
+};
+
+// Data Packet Structure
+struct DataPacket {
+  byte startByte;
+  byte command;
+  byte dataLength;
+  byte data[8];
+  byte checksum;
+  byte endByte;
+};
+
+// Function Prototypes
+void initializeCommunication();
+void sendDataPacket(DataPacket packet);
+DataPacket receiveDataPacket();
+bool validateChecksum(DataPacket packet);
+void handleSerialCommand();
+void sendToComputer(float efficiency, float power, float temp);
+
+#endif

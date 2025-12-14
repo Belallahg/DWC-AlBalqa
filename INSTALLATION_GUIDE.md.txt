@@ -1,0 +1,31 @@
+# Installation Guide
+# Smart DWC System - Al-Balqa Applied University
+
+## Hardware Requirements:
+1. Arduino Mega 2560
+2. Voltage/Current Sensors
+3. Temperature Sensor (LM35)
+4. Power Supply (48V DC)
+5. MOSFET H-Bridge
+6. Resonant Coils
+
+## Software Installation:
+
+### 1. Arduino Setup:
+- Install Arduino IDE from arduino.cc
+- Copy all files from `Arduino_Firmware/` to Arduino folder
+- Open `smart_dwc_system.ino`
+- Select Board: Arduino Mega 2560
+- Select Port: COMx (check Device Manager)
+- Click Upload
+
+### 2. Python Setup:
+```bash
+# Install Python 3.8 or higher
+python --version
+
+# Install required libraries
+pip install -r requirements.txt
+
+# Run the application
+python main.py

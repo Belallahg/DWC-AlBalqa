@@ -1,0 +1,339 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+SMART DWC MONITORING SYSTEM - MAIN APPLICATION
+Al-Balqa Applied University | Graduation Project 2024/2025
+"""
+
+import tkinter as tk
+from tkinter import ttk, messagebox
+import serial
+import threading
+import time
+import json
+from datetime import datetime
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import pandas as pd
+
+# ============================================
+# MAIN APPLICATION CLASS
+# ============================================
+
+class DWC_Monitoring_System:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("Smart DWC System - Monitoring Dashboard")
+        self.root.geometry("1200x800")
+        
+        # System Variables
+        self.efficiency = 0.0
+        self.input_power = 0.0
+        self.output_power = 0.0
+        self.temperature = 25.0
+        self.misalignment = 0.0
+        self.system_status = "Disconnected"
+        
+        # Data Storage
+        self.data_history = []
+        self.max_history_points = 100
+        
+        # Serial Connection
+        self.serial_port = None
+        self.serial_thread = None
+        self.running = False
+        
+        # Initialize GUI
+        self.setup_gui()
+        
+        # Start Monitoring Thread
+        self.start_monitoring_thread()
+        
+    def setup_gui(self):
+        """Setup the main GUI interface"""
+        # Main Frame
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        # Title
+        title_label = tk.Label(main_frame, 
+                              text="⚡ SMART DYNAMIC WIRELESS CHARGING SYSTEM",
+                              font=("Arial", 20, "bold"),
+                              fg="#2E7D32")
+        title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
+        
+        # University Info
+        uni_label = tk.Label(main_frame,
+                            text="Al-Balqa Applied University | Electrical Engineering | 2024/2025",
+                            font=("Arial", 10),
+                            fg="#555555")
+        uni_label.grid(row=1, column=0, columnspan=3, pady=(0, 20))
+        
+        # ===== LEFT PANEL - System Status =====
+        status_frame = ttk.LabelFrame(main_frame, text="System Status", padding="10")
+        status_frame.grid(row=2, column=0, padx=5, pady=5, sticky=tk.N)
+        
+        # Efficiency Display
+        self.efficiency_var = tk.StringVar(value="-- %")
+        ttk.Label(status_frame, text="Efficiency:", font=("Arial", 12)).grid(row=0, column=0, sticky=tk.W)
+        self.efficiency_label = ttk.Label(status_frame, 
+                                         textvariable=self.efficiency_var,
+                                         font=("Arial", 24, "bold"),
+                                         foreground=self.get_efficiency_color(0))
+        self.efficiency_label.grid(row=0, column=1, padx=20)
+        
+        # Power Display
+        ttk.Label(status_frame, text="Input Power:").grid(row=1, column=0, sticky=tk.W)
+        self.input_power_label = ttk.Label(status_frame, text="-- W")
+        self.input_power_label.grid(row=1, column=1, sticky=tk.W)
+        
+        ttk.Label(status_frame, text="Output Power:").grid(row=2, column=0, sticky=tk.W)
+        self.output_power_label = ttk.Label(status_frame, text="-- W")
+        self.output_power_label.grid(row=2, column=1, sticky=tk.W)
+        
+        # Temperature
+        ttk.Label(status_frame, text="Temperature:").grid(row=3, column=0, sticky=tk.W)
+        self.temp_label = ttk.Label(status_frame, text="-- °C")
+        self.temp_label.grid(row=3, column=1, sticky=tk.W)
+        
+        # Misalignment
+        ttk.Label(status_frame, text="Misalignment:").grid(row=4, column=0, sticky=tk.W)
+        self.misalignment_label = ttk.Label(status_frame, text="-- cm")
+        self.misalignment_label.grid(row=4, column=1, sticky=tk.W)
+        
+        # Status Indicator
+        ttk.Label(status_frame, text="System Status:").grid(row=5, column=0, sticky=tk.W)
+        self.status_indicator = tk.Canvas(status_frame, width=20, height=20)
+        self.status_indicator.grid(row=5, column=1)
+        self.update_status_indicator("red")
+        
+        # ===== MIDDLE PANEL - Controls =====
+        control_frame = ttk.LabelFrame(main_frame, text="System Control", padding="10")
+        control_frame.grid(row=2, column=1, padx=5, pady=5, sticky=tk.N)
+        
+        # Control Buttons
+        self.start_btn = ttk.Button(control_frame, text="Start Charging", 
+                                   command=self.start_charging)
+        self.start_btn.grid(row=0, column=0, pady=5)
+        
+        self.stop_btn = ttk.Button(control_frame, text="Stop Charging",
+                                  command=self.stop_charging, state=tk.DISABLED)
+        self.stop_btn.grid(row=1, column=0, pady=5)
+        
+        # Power Level Control
+        ttk.Label(control_frame, text="Power Level:").grid(row=2, column=0, pady=(10,0))
+        self.power_scale = ttk.Scale(control_frame, from_=0, to=100, orient=tk.HORIZONTAL)
+        self.power_scale.grid(row=3, column=0, pady=5)
+        self.power_scale.set(80)
+        
+        # Connection Settings
+        ttk.Label(control_frame, text="Serial Port:").grid(row=4, column=0, pady=(10,0))
+        self.port_combo = ttk.Combobox(control_frame, values=self.get_serial_ports())
+        self.port_combo.grid(row=5, column=0, pady=5)
+        if self.port_combo['values']:
+            self.port_combo.current(0)
+        
+        self.connect_btn = ttk.Button(control_frame, text="Connect", 
+                                     command=self.connect_serial)
+        self.connect_btn.grid(row=6, column=0, pady=5)
+        
+        # ===== RIGHT PANEL - Data Log =====
+        log_frame = ttk.LabelFrame(main_frame, text="Event Log", padding="10")
+        log_frame.grid(row=2, column=2, padx=5, pady=5, sticky=tk.N)
+        
+        # Event Log Text
+        self.log_text = tk.Text(log_frame, width=40, height=15)
+        self.log_text.grid(row=0, column=0)
+        
+        log_scrollbar = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, 
+                                      command=self.log_text.yview)
+        log_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        self.log_text['yscrollcommand'] = log_scrollbar.set
+        
+        # Log Controls
+        ttk.Button(log_frame, text="Clear Log", 
+                  command=self.clear_log).grid(row=1, column=0, pady=5)
+        ttk.Button(log_frame, text="Export Data", 
+                  command=self.export_data).grid(row=2, column=0, pady=5)
+        
+        # ===== BOTTOM PANEL - Real-time Graph =====
+        graph_frame = ttk.LabelFrame(main_frame, text="Efficiency Trend", padding="10")
+        graph_frame.grid(row=3, column=0, columnspan=3, pady=10, sticky=(tk.W, tk.E))
+        
+        # Create Matplotlib Figure
+        self.figure = plt.Figure(figsize=(10, 4), dpi=80)
+        self.ax = self.figure.add_subplot(111)
+        self.ax.set_xlabel('Time (seconds)')
+        self.ax.set_ylabel('Efficiency (%)')
+        self.ax.grid(True, alpha=0.3)
+        self.line, = self.ax.plot([], [], 'b-', linewidth=2)
+        
+        # Embed in Tkinter
+        self.canvas = FigureCanvasTkAgg(self.figure, graph_frame)
+        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+    def get_efficiency_color(self, efficiency):
+        """Return color based on efficiency value"""
+        if efficiency >= 85:
+            return "#2E7D32"  # Green
+        elif efficiency >= 75:
+            return "#F9A825"  # Yellow
+        else:
+            return "#C62828"  # Red
+    
+    def get_serial_ports(self):
+        """Get available serial ports"""
+        ports = ['COM3', 'COM4', 'COM5', 'COM6', '/dev/ttyUSB0', '/dev/ttyACM0']
+        return ports
+    
+    def log_event(self, message):
+        """Add event to log with timestamp"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        log_entry = f"[{timestamp}] {message}\n"
+        self.log_text.insert(tk.END, log_entry)
+        self.log_text.see(tk.END)
+        
+        # Keep only last 100 lines
+        lines = self.log_text.get('1.0', tk.END).split('\n')
+        if len(lines) > 100:
+            self.log_text.delete('1.0', f'{len(lines)-100}.0')
+    
+    def update_status_indicator(self, color):
+        """Update status indicator color"""
+        self.status_indicator.delete("all")
+        self.status_indicator.create_oval(2, 2, 18, 18, fill=color)
+    
+    def connect_serial(self):
+        """Connect to serial port"""
+        port = self.port_combo.get()
+        if not port:
+            messagebox.showerror("Error", "Please select a serial port")
+            return
+        
+        try:
+            self.serial_port = serial.Serial(
+                port=port,
+                baudrate=115200,
+                timeout=1
+            )
+            self.system_status = "Connected"
+            self.update_status_indicator("green")
+            self.connect_btn.config(state=tk.DISABLED)
+            self.log_event(f"Connected to {port}")
+        except Exception as e:
+            messagebox.showerror("Connection Error", str(e))
+    
+    def start_monitoring_thread(self):
+        """Start the serial monitoring thread"""
+        self.running = True
+        self.serial_thread = threading.Thread(target=self.monitor_serial, daemon=True)
+        self.serial_thread.start()
+    
+    def monitor_serial(self):
+        """Monitor serial port for incoming data"""
+        while self.running:
+            if self.serial_port and self.serial_port.is_open:
+                try:
+                    line = self.serial_port.readline().decode('utf-8').strip()
+                    if line:
+                        self.process_serial_data(line)
+                except:
+                    pass
+            time.sleep(0.1)
+    
+    def process_serial_data(self, data):
+        """Process incoming serial data"""
+        try:
+            # Parse Arduino data format
+            if data.startswith("EFF:"):
+                parts = data.split("|")
+                if len(parts) >= 5:
+                    # Extract efficiency
+                    eff_str = parts[0].replace("EFF:", "").replace("%", "").strip()
+                    self.efficiency = float(eff_str)
+                    
+                    # Update GUI in main thread
+                    self.root.after(0, self.update_display)
+                    
+                    # Add to history
+                    self.data_history.append(self.efficiency)
+                    if len(self.data_history) > self.max_history_points:
+                        self.data_history.pop(0)
+                    
+                    # Update graph
+                    self.root.after(0, self.update_graph)
+        except Exception as e:
+            self.log_event(f"Data parse error: {e}")
+    
+    def update_display(self):
+        """Update all display elements"""
+        # Update efficiency
+        self.efficiency_var.set(f"{self.efficiency:.1f} %")
+        self.efficiency_label.config(foreground=self.get_efficiency_color(self.efficiency))
+        
+        # Update other labels
+        self.input_power_label.config(text=f"{self.input_power:.1f} W")
+        self.output_power_label.config(text=f"{self.output_power:.1f} W")
+        self.temp_label.config(text=f"{self.temperature:.1f} °C")
+        self.misalignment_label.config(text=f"{self.misalignment:.1f} cm")
+        
+        # Update status
+        if self.efficiency > 0:
+            self.update_status_indicator("green")
+        else:
+            self.update_status_indicator("yellow")
+    
+    def update_graph(self):
+        """Update the efficiency graph"""
+        if self.data_history:
+            self.line.set_data(range(len(self.data_history)), self.data_history)
+            self.ax.set_xlim(0, len(self.data_history))
+            self.ax.set_ylim(0, 100)
+            self.canvas.draw()
+    
+    def start_charging(self):
+        """Send start charging command"""
+        if self.serial_port and self.serial_port.is_open:
+            self.serial_port.write(b"START\n")
+            self.start_btn.config(state=tk.DISABLED)
+            self.stop_btn.config(state=tk.NORMAL)
+            self.log_event("Charging started")
+    
+    def stop_charging(self):
+        """Send stop charging command"""
+        if self.serial_port and self.serial_port.is_open:
+            self.serial_port.write(b"STOP\n")
+            self.start_btn.config(state=tk.NORMAL)
+            self.stop_btn.config(state=tk.DISABLED)
+            self.log_event("Charging stopped")
+    
+    def clear_log(self):
+        """Clear the event log"""
+        self.log_text.delete('1.0', tk.END)
+    
+    def export_data(self):
+        """Export data to CSV file"""
+        filename = f"dwc_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        try:
+            df = pd.DataFrame(self.data_history, columns=['Efficiency'])
+            df.to_csv(filename, index=False)
+            self.log_event(f"Data exported to {filename}")
+            messagebox.showinfo("Export Successful", f"Data saved to {filename}")
+        except Exception as e:
+            messagebox.showerror("Export Error", str(e))
+    
+    def on_closing(self):
+        """Cleanup on window close"""
+        self.running = False
+        if self.serial_port and self.serial_port.is_open:
+            self.serial_port.close()
+        self.root.destroy()
+
+# ============================================
+# APPLICATION ENTRY POINT
+# ============================================
+
+if __name__ == "__main__":
+    app = DWC_Monitoring_System()
+    app.root.protocol("WM_DELETE_WINDOW", app.on_closing)
+    app.root.mainloop()

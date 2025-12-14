@@ -1,0 +1,34 @@
+// ====================================================
+// SYSTEM CONFIGURATION
+// ====================================================
+
+#ifndef DWC_CONFIG_H
+#define DWC_CONFIG_H
+
+// System Configuration
+#define SYSTEM_VERSION         "2.0"
+#define MAX_POWER_WATTS        100.0
+#define TARGET_EFFICIENCY      85.0
+#define SAFETY_TEMP_LIMIT      85.0    // Celsius
+#define MAX_CURRENT_AMPS       5.0
+#define OPERATING_FREQUENCY    85000   // 85 kHz
+
+// Control Parameters
+#define PID_KP                 1.0
+#define PID_KI                 0.05
+#define PID_KD                 0.01
+#define CONTROL_SAMPLE_TIME    0.1     // 100ms
+
+// Safety Thresholds
+#define EFFICIENCY_MIN         70.0    // Minimum efficiency %
+#define VOLTAGE_MAX            60.0    // Maximum voltage
+#define CURRENT_MAX            5.5     // Maximum current
+#define MISALIGNMENT_MAX       20.0    // Maximum offset in cm
+
+// Hardware Pins
+#define POWER_ENABLE_PIN       8
+#define STATUS_LED_PIN         13
+#define BUZZER_PIN             9
+#define RELAY_CONTROL_PIN      10
+
+#endif

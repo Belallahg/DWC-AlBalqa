@@ -1,0 +1,143 @@
+// ====================================================
+// SMART DYNAMIC WIRELESS CHARGING SYSTEM - MAIN FILE
+// Al-Balqa Applied University | EE Graduation Project
+// Version: 2.0 | Date: 2025
+// ====================================================
+
+#include "dwc_sensors.h"
+#include "dwc_calculations.h"
+#include "dwc_communication.h"
+#include "dwc_config.h"
+
+// System State Machine
+enum SystemState { INIT, READY, CHARGING, ERROR, SAFETY_STOP };
+SystemState currentState = INIT;
+
+// Global Variables
+float systemEfficiency = 0.0;
+float inputPower = 0.0;
+float outputPower = 0.0;
+float coilTemperature = 25.0;
+float lateralOffset = 0.0;
+
+// Timing Variables
+unsigned long lastUpdateTime = 0;
+const unsigned long UPDATE_INTERVAL = 100; // 100ms = 10Hz
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  
+  Serial.println("==========================================");
+  Serial.println(" SMART DWC SYSTEM - INITIALIZATION");
+  Serial.println(" Al-Balqa Applied University");
+  Serial.println(" 2024/2025 Graduation Project");
+  Serial.println("==========================================");
+  
+  // Initialize Subsystems
+  initializeSensors();
+  initializePowerControl();
+  initializeSafetySystem();
+  initializeCommunication();
+  
+  currentState = READY;
+  Serial.println("[STATUS] System Ready for Operation");
+  Serial.println("------------------------------------------");
+}
+
+void loop() {
+  unsigned long currentMillis = millis();
+  
+  // Main Control Loop - 10Hz Operation
+  if (currentMillis - lastUpdateTime >= UPDATE_INTERVAL) {
+    lastUpdateTime = currentMillis;
+    
+    // 1. SAFETY CHECK (Highest Priority)
+    if (!performSafetyCheck()) {
+      emergencyShutdown();
+      return;
+    }
+    
+    // 2. SENSOR DATA ACQUISITION
+    SensorData data = readAllSensors();
+    
+    // 3. EFFICIENCY CALCULATION
+    systemEfficiency = calculateSystemEfficiency(data);
+    
+    // 4. MISALIGNMENT DETECTION
+    lateralOffset = detectMisalignment(data);
+    
+    // 5. ADAPTIVE CONTROL
+    if (currentState == CHARGING) {
+      float controlSignal = adaptivePIDControl(systemEfficiency, TARGET_EFFICIENCY);
+      adjustPowerTransfer(controlSignal);
+      
+      // Handle misalignment
+      if (lateralOffset > 10.0) {
+        handleMisalignment(lateralOffset);
+      }
+    }
+    
+    // 6. DATA LOGGING
+    logSystemData(data, systemEfficiency);
+    
+    // 7. SERIAL OUTPUT
+    displaySystemStatus();
+  }
+  
+  // Handle Serial Commands
+  if (Serial.available() > 0) {
+    handleSerialCommand();
+  }
+}
+
+// ==================== SUPPORTING FUNCTIONS ====================
+
+float calculateSystemEfficiency(SensorData data) {
+  inputPower = data.inputVoltage * data.inputCurrent;
+  outputPower = data.outputVoltage * data.outputCurrent;
+  
+  if (inputPower > 0.1) { // Avoid division by zero
+    float rawEfficiency = (outputPower / inputPower) * 100.0;
+    
+    // Temperature compensation
+    float tempFactor = 1.0 - ((data.temperature - 25.0) * 0.001);
+    
+    // Alignment compensation
+    float alignmentFactor = 1.0 - (data.misalignment * 0.015);
+    
+    return rawEfficiency * tempFactor * alignmentFactor;
+  }
+  return 0.0;
+}
+
+void displaySystemStatus() {
+  Serial.print("EFF: ");
+  Serial.print(systemEfficiency, 1);
+  Serial.print("% | P_in: ");
+  Serial.print(inputPower, 1);
+  Serial.print("W | P_out: ");
+  Serial.print(outputPower, 1);
+  Serial.print("W | Temp: ");
+  Serial.print(coilTemperature, 1);
+  Serial.print("C | Offset: ");
+  Serial.print(lateralOffset, 1);
+  Serial.println("cm");
+  
+  if (systemEfficiency < 75.0) {
+    Serial.println("[WARNING] Efficiency below threshold!");
+  }
+}
+
+void emergencyShutdown() {
+  Serial.println("[EMERGENCY] Safety shutdown activated!");
+  currentState = SAFETY_STOP;
+  disablePowerOutput();
+  activateWarningLED();
+  
+  while(1) {
+    // System halted - requires manual reset
+    Serial.println("[SYSTEM HALTED] Check hardware and reset");
+    delay(5000);
+  }
+}
